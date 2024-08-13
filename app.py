@@ -3,13 +3,22 @@ import os
 from ultralytics import YOLO
 import cv2
 from ultralytics.utils.plotting import Annotator
-import time
+import shutil
+import easyocr
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/'
+app.config['PROCESSED_FOLDER']='static/uploads/processed'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def clear_upload_folders():
+    for file in [app.config['UPLOAD_FOLDER'],app.config["PROCESSED_FOLDER"]]:
+        if os.path.exists(file):
+            shutil.rmtree(file)
+        os.makedirs(file)
+
+clear_upload_folders()
 video_cap = None
 model = None
 output_video_path = ''
@@ -46,13 +55,12 @@ def upload_file():
 
 @app.route('/download/<path:filename>')
 def download_file(filename):
-    print(filename)
     return send_from_directory('static/', filename, as_attachment=True)
 
 def process_image(image_path):
     image = cv2.imread(image_path)
     
-    model = YOLO(r'C:\Users\aryan\OneDrive\Desktop\CV PROJECTS\number plate recognition\best.pt')
+    model = YOLO(r'best.pt')
 
     results = model(image)
     
@@ -75,7 +83,7 @@ def process_image(image_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, img_crop)
     gray = cv2.cvtColor(img_crop, cv2.COLOR_BGR2GRAY)
-    import easyocr
+    
     reader = easyocr.Reader(['en'])
     result = reader.readtext(gray)
     text = ""
@@ -102,12 +110,12 @@ def video_feed():
 def generate_frames():
     global video_cap, model
 
-    model = YOLO(r'C:\Users\aryan\OneDrive\Desktop\CV PROJECTS\number plate recognition\best.pt')
+    model = YOLO(r'best.pt')
 
-    org = (450, 250)  # Coordinates of the bottom-left corner of the text string
+    org = (450, 250)  
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 3
-    color = (0, 255, 0)  # BGR color (blue, green, red)
+    color = (0, 255, 0)  
     thickness = 4
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = video_cap.get(cv2.CAP_PROP_FPS)
@@ -139,7 +147,6 @@ def generate_frames():
             annotated_frame = annotator.result()
             
             gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
-            import easyocr
 
             reader = easyocr.Reader(['en'])
 
@@ -150,8 +157,6 @@ def generate_frames():
                 if(len(results)==1) or (len(detection[1]>6) and detection[2]>0.2):
                     text = detection[1]
                     text = (str(text.replace('*','').replace('.','').replace(' ','').upper()))
-                
-        # Get the annotated frame 
         
         cv2.putText(annotated_frame, text, org, font, font_scale, color, thickness)
         out.write(annotated_frame)
@@ -162,6 +167,7 @@ def generate_frames():
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
     video_cap.release()
     out.release()
+    clear_upload_folders()
 
 if __name__ == '__main__':
     app.run(debug=True)

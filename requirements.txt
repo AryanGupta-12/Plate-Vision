@@ -1,0 +1,5 @@
+easyocr
+flask
+gunicorn
+ultralytics
+opencv-python
